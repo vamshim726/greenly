@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Trophy, Users, Target, Calendar, Loader2 } from "lucide-react";
@@ -24,6 +30,7 @@ interface Challenge {
 
 interface LeaderboardEntry {
   user_id: string;
+  full_name: string | null;
   total_co2_saved: number;
   action_count: number;
 }
@@ -43,65 +50,81 @@ const Challenges = () => {
 
   const fetchChallenges = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        // This shouldn't happen since we're in a protected route
+        toast({
+          title: "Error",
+          description: "User session not found",
+          variant: "destructive",
+        });
+        return;
+      }
 
       // Fetch all challenges
       const { data: challengesData, error: challengesError } = await supabase
-        .from('challenges')
-        .select('*')
-        .eq('is_active', true)
-        .order('start_date', { ascending: true });
+        .from("challenges")
+        .select("*")
+        .eq("is_active", true)
+        .order("start_date", { ascending: true });
 
       if (challengesError) throw challengesError;
 
       // Fetch user's joined challenges
       const { data: participantData, error: participantError } = await supabase
-        .from('challenge_participants')
-        .select('challenge_id')
-        .eq('user_id', user.id);
+        .from("challenge_participants")
+        .select("challenge_id")
+        .eq("user_id", user.id);
 
       if (participantError) throw participantError;
 
-      const joinedChallengeIds = participantData?.map(p => p.challenge_id) || [];
+      const joinedChallengeIds =
+        participantData?.map((p) => p.challenge_id) || [];
 
       // Fetch participant counts and CO2 totals for each challenge
       const challengesWithData = await Promise.all(
         challengesData?.map(async (challenge) => {
           // Get participant count
           const { count: participantCount } = await supabase
-            .from('challenge_participants')
-            .select('*', { count: 'exact', head: true })
-            .eq('challenge_id', challenge.id);
+            .from("challenge_participants")
+            .select("*", { count: "exact", head: true })
+            .eq("challenge_id", challenge.id);
 
           // Get total CO2 saved by participants
           const { data: actionsData } = await supabase
-            .from('eco_actions')
-            .select('co2_saved, user_id')
-            .in('user_id', 
+            .from("eco_actions")
+            .select("co2_saved, user_id")
+            .in(
+              "user_id",
               await supabase
-                .from('challenge_participants')
-                .select('user_id')
-                .eq('challenge_id', challenge.id)
-                .then(res => res.data?.map(p => p.user_id) || [])
+                .from("challenge_participants")
+                .select("user_id")
+                .eq("challenge_id", challenge.id)
+                .then((res) => res.data?.map((p) => p.user_id) || [])
             )
-            .gte('action_date', challenge.start_date)
-            .lte('action_date', challenge.end_date);
+            .gte("action_date", challenge.start_date)
+            .lte("action_date", challenge.end_date);
 
-          const totalCO2Saved = actionsData?.reduce((sum, action) => sum + Number(action.co2_saved), 0) || 0;
+          const totalCO2Saved =
+            actionsData?.reduce(
+              (sum, action) => sum + Number(action.co2_saved),
+              0
+            ) || 0;
 
           return {
             ...challenge,
             participant_count: participantCount || 0,
             user_joined: joinedChallengeIds.includes(challenge.id),
-            total_co2_saved: totalCO2Saved
+            total_co2_saved: totalCO2Saved,
           };
         }) || []
       );
 
       // Separate joined and available challenges
-      const joined = challengesWithData.filter(c => c.user_joined);
-      const available = challengesWithData.filter(c => !c.user_joined);
+      const joined = challengesWithData.filter((c) => c.user_joined);
+      const available = challengesWithData.filter((c) => !c.user_joined);
 
       setChallenges(available);
       setUserChallenges(joined);
@@ -118,47 +141,84 @@ const Challenges = () => {
 
   const fetchLeaderboard = async () => {
     try {
-      const { data, error } = await supabase
-        .from('eco_actions')
-        .select('user_id, co2_saved')
-        .gte('action_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+      // Use the custom function to get leaderboard data (bypasses RLS)
+      // Force fresh data by avoiding cache
+      const { data: leaderboardData, error: leaderboardError } =
+        await supabase.rpc("get_leaderboard");
 
-      if (error) throw error;
+      if (leaderboardError) {
+        console.error("Error fetching leaderboard:", leaderboardError);
 
-      // Group by user and calculate totals
-      const userTotals = data?.reduce((acc, action) => {
-        const userId = action.user_id;
-        if (!acc[userId]) {
-          acc[userId] = { user_id: userId, total_co2_saved: 0, action_count: 0 };
-        }
-        acc[userId].total_co2_saved += Number(action.co2_saved);
-        acc[userId].action_count += 1;
-        return acc;
-      }, {} as Record<string, LeaderboardEntry>) || {};
+        // Fallback: fetch data directly if function fails
+        console.log("Fallback: Fetching leaderboard data directly from tables");
+        const { data: actionsData, error: actionsError } = await supabase.from(
+          "eco_actions"
+        ).select(`
+            user_id,
+            co2_saved,
+            profiles!inner(full_name)
+          `);
 
-      const sortedLeaderboard = Object.values(userTotals)
-        .sort((a, b) => b.total_co2_saved - a.total_co2_saved)
-        .slice(0, 10);
+        if (actionsError) throw actionsError;
 
-      setLeaderboard(sortedLeaderboard);
+        // Aggregate data manually
+        const userMap = new Map();
+        actionsData?.forEach((action) => {
+          const userId = action.user_id;
+          if (!userMap.has(userId)) {
+            userMap.set(userId, {
+              user_id: userId,
+              total_co2_saved: 0,
+              action_count: 0,
+              full_name: action.profiles?.full_name || "Anonymous User",
+            });
+          }
+          const user = userMap.get(userId);
+          user.total_co2_saved += Number(action.co2_saved);
+          user.action_count += 1;
+        });
+
+        const fallbackData = Array.from(userMap.values())
+          .filter((entry) => entry.action_count > 0)
+          .sort((a, b) => b.total_co2_saved - a.total_co2_saved);
+
+        console.log("Fallback leaderboard data:", fallbackData);
+        setLeaderboard(fallbackData);
+        return;
+      }
+
+      console.log("Raw leaderboard data from function:", leaderboardData); // Debug log
+
+      // Filter out users with zero actions and format the data
+      const filteredLeaderboard = (leaderboardData || [])
+        .filter((entry) => Number(entry.action_count) > 0)
+        .map((entry) => ({
+          user_id: entry.user_id,
+          full_name: entry.full_name,
+          total_co2_saved: Number(entry.total_co2_saved),
+          action_count: Number(entry.action_count),
+        }));
+
+      console.log("Filtered leaderboard data:", filteredLeaderboard); // Debug log
+      setLeaderboard(filteredLeaderboard);
     } catch (error: any) {
-      console.error('Failed to fetch leaderboard:', error);
+      console.error("Failed to fetch leaderboard:", error);
     }
   };
 
   const joinChallenge = async (challengeId: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return;
 
     setJoinLoading(challengeId);
 
     try {
-      const { error } = await supabase
-        .from('challenge_participants')
-        .insert({
-          challenge_id: challengeId,
-          user_id: user.id
-        });
+      const { error } = await supabase.from("challenge_participants").insert({
+        challenge_id: challengeId,
+        user_id: user.id,
+      });
 
       if (error) throw error;
 
@@ -180,17 +240,19 @@ const Challenges = () => {
   };
 
   const leaveChallenge = async (challengeId: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return;
 
     setJoinLoading(challengeId);
 
     try {
       const { error } = await supabase
-        .from('challenge_participants')
+        .from("challenge_participants")
         .delete()
-        .eq('challenge_id', challengeId)
-        .eq('user_id', user.id);
+        .eq("challenge_id", challengeId)
+        .eq("user_id", user.id);
 
       if (error) throw error;
 
@@ -211,7 +273,13 @@ const Challenges = () => {
     }
   };
 
-  const ChallengeCard = ({ challenge, showLeaveButton = false }: { challenge: Challenge; showLeaveButton?: boolean }) => (
+  const ChallengeCard = ({
+    challenge,
+    showLeaveButton = false,
+  }: {
+    challenge: Challenge;
+    showLeaveButton?: boolean;
+  }) => (
     <Card key={challenge.id}>
       <CardHeader>
         <div className="flex justify-between items-start">
@@ -231,18 +299,23 @@ const Challenges = () => {
           <div className="grid grid-cols-2 gap-4">
             <div className="flex items-center gap-2">
               <Target className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm">Target: {challenge.target_co2} kg CO₂</span>
+              <span className="text-sm">
+                Target: {challenge.target_co2} kg CO₂
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <Users className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm">{challenge.participant_count} participants</span>
+              <span className="text-sm">
+                {challenge.participant_count} participants
+              </span>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-muted-foreground" />
             <span className="text-sm">
-              {format(new Date(challenge.start_date), "MMM d")} - {format(new Date(challenge.end_date), "MMM d, yyyy")}
+              {format(new Date(challenge.start_date), "MMM d")} -{" "}
+              {format(new Date(challenge.end_date), "MMM d, yyyy")}
             </span>
           </div>
 
@@ -308,12 +381,13 @@ const Challenges = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      
+
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Community Challenges</h1>
           <p className="text-muted-foreground">
-            Join challenges and compete with others to maximize your environmental impact
+            Join challenges and compete with others to maximize your
+            environmental impact
           </p>
         </div>
 
@@ -329,7 +403,9 @@ const Challenges = () => {
               <Card>
                 <CardContent className="py-8 text-center">
                   <Trophy className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-muted-foreground">No available challenges at the moment</p>
+                  <p className="text-muted-foreground">
+                    No available challenges at the moment
+                  </p>
                 </CardContent>
               </Card>
             ) : (
@@ -346,14 +422,22 @@ const Challenges = () => {
               <Card>
                 <CardContent className="py-8 text-center">
                   <Target className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-muted-foreground">You haven't joined any challenges yet</p>
-                  <p className="text-sm text-muted-foreground mt-2">Check out the available challenges to get started!</p>
+                  <p className="text-muted-foreground">
+                    You haven't joined any challenges yet
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Check out the available challenges to get started!
+                  </p>
                 </CardContent>
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {userChallenges.map((challenge) => (
-                  <ChallengeCard key={challenge.id} challenge={challenge} showLeaveButton />
+                  <ChallengeCard
+                    key={challenge.id}
+                    challenge={challenge}
+                    showLeaveButton
+                  />
                 ))}
               </div>
             )}
@@ -364,39 +448,60 @@ const Challenges = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Trophy className="w-5 h-5" />
-                  Top Eco Warriors (Last 30 Days)
+                  Top Eco Warriors Leaderboard
                 </CardTitle>
                 <CardDescription>
-                  Users with the highest CO₂ savings this month
+                  Users ranked by their total CO₂ savings from all eco-actions
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {leaderboard.length === 0 ? (
                   <div className="text-center py-8">
                     <Trophy className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p className="text-muted-foreground">No data available yet</p>
+                    <p className="text-muted-foreground">
+                      No data available yet
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     {leaderboard.map((entry, index) => (
-                      <div key={entry.user_id} className="flex items-center justify-between p-4 rounded-lg border">
+                      <div
+                        key={entry.user_id}
+                        className="flex items-center justify-between p-4 rounded-lg border"
+                      >
                         <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                            index === 0 ? 'bg-primary text-primary-foreground' :
-                            index === 1 ? 'bg-muted text-muted-foreground' :
-                            index === 2 ? 'bg-accent text-accent-foreground' :
-                            'bg-muted text-muted-foreground'
-                          }`}>
+                          <div
+                            className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                              index === 0
+                                ? "bg-primary text-primary-foreground"
+                                : index === 1
+                                ? "bg-muted text-muted-foreground"
+                                : index === 2
+                                ? "bg-accent text-accent-foreground"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                          >
                             {index + 1}
                           </div>
                           <div>
-                            <p className="font-medium">User {entry.user_id.slice(0, 8)}</p>
-                            <p className="text-sm text-muted-foreground">{entry.action_count} actions</p>
+                            <p className="font-medium">
+                              {entry.full_name ||
+                                `User ${entry.user_id.slice(0, 8)}`}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {entry.action_count === 0
+                                ? "No actions yet"
+                                : `${entry.action_count} actions`}
+                            </p>
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-primary">{entry.total_co2_saved.toFixed(2)} kg</p>
-                          <p className="text-sm text-muted-foreground">CO₂ saved</p>
+                          <p className="font-bold text-primary">
+                            {entry.total_co2_saved.toFixed(2)} kg
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            CO₂ saved
+                          </p>
                         </div>
                       </div>
                     ))}

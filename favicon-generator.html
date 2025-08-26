@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Favicon Generator</title>
+  </head>
+  <body>
+    <canvas id="canvas16" width="16" height="16"></canvas>
+    <canvas id="canvas32" width="32" height="32"></canvas>
+    <canvas id="canvas48" width="48" height="48"></canvas>
+
+    <script>
+      function createFavicon(canvasId, size) {
+        const canvas = document.getElementById(canvasId);
+        const ctx = canvas.getContext("2d");
+
+        // Fill background with green
+        ctx.fillStyle = "#22c55e";
+        ctx.fillRect(0, 0, size, size);
+
+        // Add tree emoji
+        ctx.font = `${size * 0.7}px Arial`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("🌳", size / 2, size / 2);
+
+        // Convert to PNG and download
+        canvas.toBlob(function (blob) {
+          const link = document.createElement("a");
+          link.download = `favicon-${size}x${size}.png`;
+          link.href = URL.createObjectURL(blob);
+          link.click();
+        });
+      }
+
+      // Generate favicons on page load
+      setTimeout(() => {
+        createFavicon("canvas16", 16);
+        setTimeout(() => createFavicon("canvas32", 32), 100);
+        setTimeout(() => createFavicon("canvas48", 48), 200);
+      }, 100);
+    </script>
+  </body>
+</html>

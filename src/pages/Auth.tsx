@@ -2,7 +2,13 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Leaf, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -12,7 +18,9 @@ import { useToast } from "@/hooks/use-toast";
 const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("signin");
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -24,8 +32,11 @@ const Auth = () => {
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/dashboard`
-      }
+        emailRedirectTo: `${window.location.origin}/dashboard`,
+        data: {
+          full_name: fullName,
+        },
+      },
     });
 
     if (error) {
@@ -36,9 +47,14 @@ const Auth = () => {
       });
     } else {
       toast({
-        title: "Check your email",
-        description: "We've sent you a confirmation link",
+        title: "Registration Successful!",
+        description:
+          "Your account has been created successfully. You can now sign in.",
       });
+      // Clear form and switch to sign in tab
+      setFullName("");
+      setPassword("");
+      setActiveTab("signin");
     }
     setLoading(false);
   };
@@ -75,7 +91,7 @@ const Auth = () => {
           </Button>
           <div className="flex items-center gap-2">
             <Leaf className="w-6 h-6 text-primary" />
-            <span className="text-xl font-bold">GreenSteps</span>
+            <span className="text-xl font-bold">Greenly</span>
           </div>
         </div>
       </div>
@@ -84,18 +100,18 @@ const Auth = () => {
       <div className="flex-1 flex items-center justify-center px-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <CardTitle>Welcome to GreenSteps</CardTitle>
+            <CardTitle>Welcome to Greenly</CardTitle>
             <CardDescription>
               Start your journey towards a greener lifestyle
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="signin">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="signin">Sign In</TabsTrigger>
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="signin">
                 <form onSubmit={handleSignIn} className="space-y-4">
                   <div className="space-y-2">
@@ -106,6 +122,7 @@ const Auth = () => {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
+                      placeholder="Enter your email"
                     />
                   </div>
                   <div className="space-y-2">
@@ -116,6 +133,7 @@ const Auth = () => {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
+                      placeholder="Enter your password"
                     />
                   </div>
                   <Button type="submit" className="w-full" disabled={loading}>
@@ -123,9 +141,20 @@ const Auth = () => {
                   </Button>
                 </form>
               </TabsContent>
-              
+
               <TabsContent value="signup">
                 <form onSubmit={handleSignUp} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-fullname">Full Name</Label>
+                    <Input
+                      id="signup-fullname"
+                      type="text"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      required
+                      placeholder="Enter your full name"
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="signup-email">Email</Label>
                     <Input
@@ -134,6 +163,7 @@ const Auth = () => {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
+                      placeholder="Enter your email"
                     />
                   </div>
                   <div className="space-y-2">
@@ -145,6 +175,7 @@ const Auth = () => {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       minLength={6}
+                      placeholder="Create a password (min 6 characters)"
                     />
                   </div>
                   <Button type="submit" className="w-full" disabled={loading}>

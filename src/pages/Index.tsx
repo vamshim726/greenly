@@ -16,8 +16,8 @@ const Index = () => {
             </div>
           </div>
           
-          <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-            GreenSteps
+          <h1 className="text-4xl  md:text-6xl font-bold mb-6 pb-4 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+            Greenly
           </h1>
           
           <p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-2xl mx-auto">

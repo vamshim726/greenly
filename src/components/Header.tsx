@@ -25,13 +25,20 @@ const Header = () => {
     <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/dashboard")}>
+          <div
+            className="flex items-center gap-2 cursor-pointer"
+            onClick={() => navigate("/dashboard")}
+          >
             <Leaf className="w-6 h-6 text-primary" />
-            <span className="text-xl font-bold">GreenSteps</span>
+            <span className="text-xl font-bold">Greenly</span>
           </div>
-          
+
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/profile")}
+            >
               <User className="w-4 h-4 mr-2" />
               Profile
             </Button>
