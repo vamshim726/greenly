@@ -75,7 +75,6 @@ const Dashboard = () => {
           setUserProfile(profileData);
         } catch (error) {
           // Profile might not exist yet, which is fine
-          console.log("Profile not found:", error);
         }
       }
     };

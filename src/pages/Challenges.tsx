@@ -150,7 +150,6 @@ const Challenges = () => {
         console.error("Error fetching leaderboard:", leaderboardError);
 
         // Fallback: fetch data directly if function fails
-        console.log("Fallback: Fetching leaderboard data directly from tables");
         const { data: actionsData, error: actionsError } = await supabase.from(
           "eco_actions"
         ).select(`
@@ -182,12 +181,9 @@ const Challenges = () => {
           .filter((entry) => entry.action_count > 0)
           .sort((a, b) => b.total_co2_saved - a.total_co2_saved);
 
-        console.log("Fallback leaderboard data:", fallbackData);
         setLeaderboard(fallbackData);
         return;
       }
-
-      console.log("Raw leaderboard data from function:", leaderboardData); // Debug log
 
       // Filter out users with zero actions and format the data
       const filteredLeaderboard = (leaderboardData || [])
@@ -199,7 +195,6 @@ const Challenges = () => {
           action_count: Number(entry.action_count),
         }));
 
-      console.log("Filtered leaderboard data:", filteredLeaderboard); // Debug log
       setLeaderboard(filteredLeaderboard);
     } catch (error: any) {
       console.error("Failed to fetch leaderboard:", error);
