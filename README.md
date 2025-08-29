@@ -193,19 +193,19 @@ npm run dev
 
 ### Dashboard Overview
 
-![Dashboard](https://via.placeholder.com/800x400/22c55e/ffffff?text=Dashboard+Overview)
+![Dashboard](./dashboard-imgs/dboard.png)
 
 ### Action Logging
 
-![Action Logging](https://via.placeholder.com/800x400/3b82f6/ffffff?text=Action+Logging)
+![Action Logging](./dashboard-imgs/actions.png)
 
 ### Community Leaderboard
 
-![Leaderboard](https://via.placeholder.com/800x400/f59e0b/ffffff?text=Community+Leaderboard)
+![Leaderboard](./dashboard-imgs/leader.png)
 
 ### Analytics & Charts
 
-![Analytics](https://via.placeholder.com/800x400/8b5cf6/ffffff?text=Analytics+%26+Charts)
+![Analytics](./dashboard-imgs/analytics.png)
 
 ---
 
